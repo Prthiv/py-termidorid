@@ -8,7 +8,7 @@ import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
 import { TriangleAlert } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
-import { usePushNotifications } from '../hooks/usePushNotifications';
+import { usePushNotifications } from '../hooks/use-push-notifications';
 
 const loadingSequence = [
   'Booting secure kernel v2.1.8...',
@@ -275,9 +275,14 @@ export default function TtyChat() {
   }, [decoyAction, status]);
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
+    const timer = setTimeout(() => {
+      endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    
     inputRef.current?.focus();
-  }, [terminalOutput, messages, status]);
+
+    return () => clearTimeout(timer);
+  }, [terminalOutput, messages]);
   
   const renderMessage = (msg: DecryptedMessage) => {
     if (msg.text === emergencyMessageText) {
@@ -354,8 +359,10 @@ export default function TtyChat() {
       case '/clear':
       case 'qc':
       case '/qc':
-        setTerminalOutput([]);
-        clearChatHistory?.();
+        if(clearChatHistory) {
+          clearChatHistory();
+          setTerminalOutput(prev => [...prev, 'Chat history permanently deleted.']);
+        }
         break;
       default:
         if (lowerCaseCommand !== '/img' && !lowerCaseCommand.startsWith('/urgent')) {
@@ -835,7 +842,7 @@ Already up to date.`
   }
   
   return (
-    <div className="flex flex-col h-screen p-4 font-mono text-base relative" onClick={() => inputRef.current?.focus()}>
+    <div className="flex flex-col h-dvh p-4 font-mono text-base relative" onClick={() => inputRef.current?.focus()}>
       <div className="flex-grow overflow-y-auto">
         {terminalOutput.map((line, index) => (
           <div key={`terminal-line-${index}`}>{typeof line === 'string' ? <span className="whitespace-pre-wrap">{line}</span> : line}</div>
@@ -852,7 +859,7 @@ Already up to date.`
         )}
         
         {status !== 'loading' && (
-          <form onSubmit={handleSubmit} className="flex items-center">
+          <form onSubmit={handleSubmit} className="flex items-center" dir="ltr">
             {renderPrompt(status)}
             {status !== 'password' && !isProcessRunning ? (
               <>
