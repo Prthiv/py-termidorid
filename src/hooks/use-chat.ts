@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -7,9 +8,11 @@ import { encryptMessage, decryptMessage } from '../lib/crypto';
 import type { Message, DecryptedMessage } from '../types';
 import { useToast } from "./use-toast";
 import { useWebRTC } from './useWebRTC';
-import { sendNotification } from '../app/actions/send-notification';
+import { sendPushNotification } from '../app/actions/push';
 
 const CHAT_COLLECTION = 'tty_chat_stream';
+const URGENT_NOTIFICATION_TEXT = "*** URGENT NOTIFICATION RECEIVED ***";
+
 
 export function useChat(secret: string | null, sessionId: string | null) {
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
@@ -109,7 +112,8 @@ export function useChat(secret: string | null, sessionId: string | null) {
   const sendMessage = useCallback(async (
     content: string, 
     author: string, 
-    sessionId: string
+    sessionId: string,
+    isUrgent: boolean = false
   ) => {
     if (!secret || !content.trim() || !sessionId) return;
     if (!db) {
@@ -130,8 +134,8 @@ export function useChat(secret: string | null, sessionId: string | null) {
       
       await addDoc(collection(db, CHAT_COLLECTION), docData);
 
-      // Send a push notification (fire and forget)
-      sendNotification({ author, message: content, senderSessionId: sessionId });
+      const notificationMessage = isUrgent ? "You have received a new message." : content;
+      sendPushNotification({ author, message: notificationMessage });
 
     } catch (error: any) {
       console.error('Error sending message:', error);
@@ -143,6 +147,11 @@ export function useChat(secret: string | null, sessionId: string | null) {
       });
     }
   }, [secret, toast]);
+
+  const sendUrgentNotificationMessage = useCallback(async (author: string, sessionId: string) => {
+    sendMessage(URGENT_NOTIFICATION_TEXT, author, sessionId, true);
+  }, [sendMessage]);
+
 
   const sendFileMessage = useCallback(async (
     file: File,
@@ -167,9 +176,8 @@ export function useChat(secret: string | null, sessionId: string | null) {
       messageType: messageType,
       filename: file.name
     });
-
-    // Send a push notification for the file transfer (fire and forget)
-    sendNotification({ author, message: `Sending a file: ${file.name}`, senderSessionId: sessionId });
+    
+    sendPushNotification({ author, message: `Sending a file: ${file.name}` });
     
     await sendFile(file, docRef.id);
 
@@ -204,5 +212,5 @@ export function useChat(secret: string | null, sessionId: string | null) {
   }, [secret, toast]);
 
 
-  return { messages, loading, sendMessage, sendFileMessage, connectWebRTC: connect, isWebRTCConnected, clearChatHistory };
+  return { messages, loading, sendMessage, sendUrgentNotificationMessage, sendFileMessage, connectWebRTC: connect, isWebRTCConnected, clearChatHistory, urgentNotificationText: URGENT_NOTIFICATION_TEXT };
 }

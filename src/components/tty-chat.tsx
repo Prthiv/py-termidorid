@@ -9,7 +9,7 @@ import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
 import { TriangleAlert } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
-import { usePushNotifications } from '../hooks/use-push-notifications';
+import { usePwaPush } from '../hooks/use-pwa-push';
 import { cn } from '../lib/utils';
 
 const loadingSequence = [
@@ -27,7 +27,7 @@ const loadingSequence = [
 ];
 
 const emergencyMessageText = "*** EMERGENCY DISCONNECT INITIATED BY PEER ***";
-const urgentNotificationText = "*** URGENT NOTIFICATION RECEIVED ***";
+
 const urgentDecoyMessages = [
     'SYSTEM ALERT: High-frequency data burst detected.',
     'COMPILING KERNEL MODULE...',
@@ -91,9 +91,9 @@ const initialVFS = {
 
 
 export default function TtyChat() {
-  const { isAuthenticated, isDecoyMode, user, login, logout, secret, sessionId, enterDecoyMode } = useAuth();
-  const { messages, loading: chatLoading, sendMessage, sendFileMessage, connectWebRTC, isWebRTCConnected, clearChatHistory } = useChat(isDecoyMode ? null : secret, sessionId);
-  const { initialize: initializeNotifications, cleanupTokens } = usePushNotifications();
+  const { isAuthenticated, isDecoyMode, user, login, logout, secret, sessionId, authLoading } = useAuth();
+  const { messages, loading: chatLoading, sendMessage, sendUrgentNotificationMessage, sendFileMessage, connectWebRTC, isWebRTCConnected, clearChatHistory, urgentNotificationText } = useChat(isDecoyMode ? null : secret, sessionId);
+  const { subscribe, unsubscribe, isSubscribed } = usePwaPush();
   const { toast } = useToast();
   
   const [status, setStatus] = useState<'loading' | 'guest' | 'password' | 'authenticated' | 'decoy'>('loading');
@@ -103,6 +103,7 @@ export default function TtyChat() {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessRunning, setIsProcessRunning] = useState(false);
   const [decoyAction, setDecoyAction] = useState<string | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   // VFS state for decoy mode
   const [vfs, setVfs] = useState(initialVFS);
@@ -111,6 +112,7 @@ export default function TtyChat() {
   const processIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
   const initialBootDone = useRef(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -118,9 +120,11 @@ export default function TtyChat() {
   useEffect(() => {
     if (isAuthenticated && !isDecoyMode) {
       if (connectWebRTC) connectWebRTC();
-      initializeNotifications(sessionId);
+      if (!isSubscribed) {
+        subscribe();
+      }
     }
-  }, [isAuthenticated, isDecoyMode, connectWebRTC, sessionId, initializeNotifications]);
+  }, [isAuthenticated, isDecoyMode, connectWebRTC, isSubscribed, subscribe]);
 
   useEffect(() => {
     return () => {
@@ -131,8 +135,31 @@ export default function TtyChat() {
   }, []);
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView();
+    const terminal = terminalContainerRef.current;
+    if (terminal) {
+      const threshold = 100; // px
+      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + threshold;
+      
+      if (isScrolledToBottom) {
+        endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   }, [terminalOutput, messages]);
+  
+  useEffect(() => {
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) return;
+
+    const handleResize = () => {
+      const isVisible = visualViewport.height < window.innerHeight * 0.8;
+      setIsKeyboardVisible(isVisible);
+    };
+
+    visualViewport.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => visualViewport.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (status === 'loading' && !initialBootDone.current) {
@@ -152,6 +179,7 @@ export default function TtyChat() {
   }, [status]);
 
   useEffect(() => {
+    if (authLoading) return;
     if (isAuthenticated) {
       if (isDecoyMode) {
         setStatus('decoy');
@@ -182,7 +210,7 @@ export default function TtyChat() {
         initialBootDone.current = false;
       }
     }
-  }, [isAuthenticated, isDecoyMode, status, user, isWebRTCConnected]);
+  }, [isAuthenticated, isDecoyMode, status, user, isWebRTCConnected, authLoading]);
   
   const startFakeLogs = () => {
     setIsProcessRunning(true);
@@ -283,19 +311,18 @@ export default function TtyChat() {
 
   useEffect(() => {
     inputRef.current?.focus();
-  }, [terminalOutput, messages]);
+  }, [status, isProcessRunning]);
   
   const renderMessage = (msg: DecryptedMessage) => {
-    const isCurrentUser = msg.sessionId ? msg.sessionId === sessionId : msg.author === user?.username;
+    if (!sessionId) return null; // Don't render messages if session isn't loaded
+    const isCurrentUser = msg.sessionId === sessionId;
 
     if (msg.text === emergencyMessageText) {
       return <p key={msg.id} className="text-destructive font-bold">{msg.text}</p>
     }
 
     if (msg.text === urgentNotificationText) {
-       // If the current user sent this "urgent" message, don't display anything.
-      // The confirmation is already shown in handleSubmit.
-      if (isCurrentUser) {
+       if (isCurrentUser) {
         return null;
       }
       const hash = msg.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -303,7 +330,6 @@ export default function TtyChat() {
       const decoyMessage = urgentDecoyMessages[randomIndex];
       return <p key={msg.id} className="text-yellow-400 font-bold">{decoyMessage}</p>
     }
-
 
     if ((msg.messageType === 'image' || msg.messageType === 'video')) {
       const fileType = msg.messageType;
@@ -358,7 +384,7 @@ export default function TtyChat() {
     
     switch (lowerCaseCommand) {
       case '/logout':
-        cleanupTokens(sessionId);
+        unsubscribe();
         logout();
         break;
       case 'clear':
@@ -700,7 +726,6 @@ Already up to date.`
     }
   };
 
-
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (isProcessRunning) return;
@@ -716,7 +741,7 @@ Already up to date.`
     const currentPrompt = renderPrompt(status);
 
     if (status === 'guest') {
-      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}{commandLine}</div>]);
       const lowerCaseCommand = trimmedCommand.toLowerCase();
       
       if (lowerCaseCommand === 'sudo connect') {
@@ -758,30 +783,28 @@ Already up to date.`
         }, 300);
       }
     } else if (status === 'authenticated') {
-      const lowerCaseCommand = trimmedCommand.toLowerCase();
+        const lowerCaseCommand = trimmedCommand.toLowerCase();
       
-      if (trimmedCommand.startsWith('/urgent')) {
-          if (user && sessionId && trimmedCommand.split(' ').length > 1) {
-              sendMessage(urgentNotificationText, user.username, sessionId);
-              setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>, <div key={`response-${prev.length}`}>[System] Urgent notification sent to peer.</div>]);
-          } else {
-              setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>, <div key={`response-${prev.length}`}>Usage: /urgent &lt;message&gt;</div>]);
-          }
-          return;
-      }
-      
-      if (lowerCaseCommand === '/img') {
-        setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
-        fileInputRef.current?.click();
-        return;
-      }
-      
-      if (trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(lowerCaseCommand)) {
-        setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
-        handleAuthenticCommand(trimmedCommand);
-      } else if (user && trimmedCommand && sessionId) {
-        sendMessage(trimmedCommand, user.username, sessionId);
-      }
+        if (trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(lowerCaseCommand)) {
+            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+            
+            if (lowerCaseCommand.startsWith('/urgent')) {
+                if (user && sessionId && sendUrgentNotificationMessage) {
+                    sendUrgentNotificationMessage(user.username, sessionId);
+                    setTerminalOutput(prev => [...prev, <div key={`response-${prev.length}`} className="text-muted-foreground">[System] Urgent notification sent to peer.</div>]);
+                }
+                return;
+            }
+            
+            if (lowerCaseCommand === '/img') {
+                fileInputRef.current?.click();
+                return;
+            }
+            
+            handleAuthenticCommand(trimmedCommand);
+        } else if (user && trimmedCommand && sessionId) {
+            sendMessage(trimmedCommand, user.username, sessionId);
+        }
     } else if (status === 'decoy') {
         if(trimmedCommand) {
             setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
@@ -849,14 +872,14 @@ Already up to date.`
   
   return (
     <div className="flex flex-col h-dvh p-4 font-mono text-base relative" onClick={() => inputRef.current?.focus()}>
-      <div className="flex-grow overflow-y-auto">
+      <div ref={terminalContainerRef} className="flex-grow overflow-y-auto">
         {terminalOutput.map((line, index) => (
           <div key={`terminal-line-${index}`}>{typeof line === 'string' ? <span className="whitespace-pre-wrap">{line}</span> : line}</div>
         ))}
         
-        {isAuthenticated && !isDecoyMode && messages.map(renderMessage)}
+        {isAuthenticated && !isDecoyMode && !authLoading && messages.map(renderMessage)}
 
-        {chatLoading && isAuthenticated && !isDecoyMode && (
+        {(chatLoading || (authLoading && isAuthenticated)) && (
           <div key="skeleton" className="pt-2 flex items-center">
             <span className="text-primary">{user?.username || 'root'}@root</span>
             <span className="text-accent">:$~ </span>
@@ -865,29 +888,30 @@ Already up to date.`
         )}
         
         {status !== 'loading' && (
-          <form onSubmit={handleSubmit} className="flex items-center">
+          <div className="flex items-center">
             {renderPrompt(status)}
-            
-            <input
-                ref={inputRef}
-                type={status === 'password' ? 'password' : 'text'}
-                value={inputValue}
-                onChange={(e) => {
-                    if (!isProcessRunning) {
-                      setInputValue(e.target.value);
-                    }
-                }}
-                onKeyDown={handleKeyDown}
-                className={cn(
-                  "flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none",
-                  status === 'password' && "text-transparent caret-transparent selection:bg-transparent"
-                )}
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck="false"
-                autoFocus
-                disabled={isProcessRunning}
-            />
+             <form onSubmit={handleSubmit} className="flex-1 flex items-center">
+                <input
+                    ref={inputRef}
+                    type={status === 'password' ? 'password' : 'text'}
+                    value={inputValue}
+                    onChange={(e) => {
+                        if (!isProcessRunning) {
+                          setInputValue(e.target.value);
+                        }
+                    }}
+                    onKeyDown={handleKeyDown}
+                    className={cn(
+                      "flex-1 bg-transparent border-none p-0 focus:ring-0 font-mono text-base outline-none",
+                      status === 'password' ? "text-transparent caret-transparent selection:bg-transparent" : "text-foreground"
+                    )}
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck="false"
+                    autoFocus
+                    disabled={isProcessRunning}
+                />
+            </form>
 
             {isProcessRunning && (
               <span className="text-muted-foreground animate-pulse">Process running... (Ctrl+C to interrupt)</span>
@@ -896,15 +920,7 @@ Already up to date.`
             {!isProcessRunning && status !== 'password' && (
               <span className="inline-block w-2 h-4 bg-foreground animate-pulse" />
             )}
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              accept="image/*,video/*"
-            />
-          </form>
+          </div>
         )}
         <div ref={endOfMessagesRef} />
       </div>
@@ -913,7 +929,10 @@ Already up to date.`
         <Button
           variant="destructive"
           size="icon"
-          className="absolute bottom-4 right-4 h-10 w-10 rounded-full opacity-50 hover:opacity-100"
+          className={cn(
+            "absolute right-4 h-10 w-10 rounded-full opacity-50 hover:opacity-100 transition-all duration-300",
+            isKeyboardVisible ? "bottom-24" : "bottom-4"
+          )}
           onClick={handleEmergency}
           title="Emergency Disconnect"
         >

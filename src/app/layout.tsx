@@ -16,21 +16,6 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <head>
         <link rel="manifest" href="/manifest.json" crossOrigin="anonymous" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/firebase-messaging-sw.js').then(function(registration) {
-                    console.log('Firebase Messaging SW registered: ', registration);
-                  }).catch(function(err) {
-                    console.log('Service Worker registration failed: ', err);
-                  });
-                });
-              }
-            `,
-          }}
-        />
         <meta name="theme-color" content="#0A0A14" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
