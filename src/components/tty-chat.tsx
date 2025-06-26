@@ -135,15 +135,7 @@ export default function TtyChat() {
   }, []);
 
   useEffect(() => {
-    const terminal = terminalContainerRef.current;
-    if (terminal) {
-      const threshold = 100; // px
-      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + threshold;
-      
-      if (isScrolledToBottom) {
-        endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
-      }
-    }
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [terminalOutput, messages]);
   
   useEffect(() => {
@@ -738,8 +730,13 @@ Already up to date.`
     }
     setHistoryIndex(-1);
 
+    // Render local commands immediately
+    if (status !== 'authenticated' || trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(trimmedCommand.toLowerCase())) {
+        const prompt = renderPrompt(status);
+        setTerminalOutput(prev => [...prev, <div key={prev.length}>{prompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+    }
+
     if (status === 'guest') {
-      setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('guest')}{commandLine}</div>]);
       const lowerCaseCommand = trimmedCommand.toLowerCase();
       
       if (lowerCaseCommand === 'sudo connect') {
@@ -772,7 +769,6 @@ Already up to date.`
         }
       }
     } else if (status === 'password') {
-      setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('password')}</div>]);
       const success = login(commandLine);
       if (!success) {
         setTimeout(() => {
@@ -784,8 +780,6 @@ Already up to date.`
         const lowerCaseCommand = trimmedCommand.toLowerCase();
       
         if (trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(lowerCaseCommand)) {
-             setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('authenticated')}<span className="whitespace-pre">{commandLine}</span></div>]);
-            
             if (lowerCaseCommand.startsWith('/urgent')) {
                 if (user && sessionId && sendUrgentNotificationMessage) {
                     sendUrgentNotificationMessage(user.username, sessionId);
@@ -805,22 +799,22 @@ Already up to date.`
         }
     } else if (status === 'decoy') {
         if(trimmedCommand) {
-            setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('decoy')}<span className="whitespace-pre">{commandLine}</span></div>]);
             handleDecoyCommand(trimmedCommand);
-        } else {
-            setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('decoy')}<span className="whitespace-pre">{commandLine}</span></div>]);
         }
     }
   };
   
-  const handleEmergency = () => {
-    if (user && sessionId) {
-      sendMessage(emergencyMessageText, user.username, sessionId);
-    }
+  const handleEmergency = async () => {
+    // Switch to decoy mode instantly for a fast UI response
+    enterDecoyMode();
     const actions = ['download', 'fsck', 'compile'];
     const randomAction = actions[Math.floor(Math.random() * actions.length)];
-    enterDecoyMode();
     setDecoyAction(randomAction);
+
+    // Send the emergency message in the background
+    if (user && sessionId) {
+      await sendMessage(emergencyMessageText, user.username, sessionId);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -941,5 +935,7 @@ Already up to date.`
     </div>
   );
 }
+
+    
 
     
