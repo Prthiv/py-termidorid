@@ -276,8 +276,6 @@ export default function TtyChat() {
   }, [decoyAction, status]);
 
   useEffect(() => {
-    // A small delay helps ensure the DOM is updated, especially on mobile,
-    // before we try to scroll.
     const timer = setTimeout(() => {
       endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 150);
@@ -293,7 +291,6 @@ export default function TtyChat() {
     }
 
     if (msg.text === urgentNotificationText) {
-      // Use a simple hash from the message ID to pick a message deterministically
       const hash = msg.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const randomIndex = hash % urgentDecoyMessages.length;
       const decoyMessage = urgentDecoyMessages[randomIndex];
@@ -864,11 +861,25 @@ Already up to date.`
         {status !== 'loading' && (
           <form onSubmit={handleSubmit} className="flex items-center">
             {renderPrompt(status)}
-            {status !== 'password' && !isProcessRunning ? (
-              <span className="whitespace-pre" dir="ltr">
-                {`\u200e${inputValue}`}
-                <span className="inline-block w-2 h-4 bg-foreground animate-pulse align-middle ml-px" />
-              </span>
+            
+            {status !== 'loading' && !isProcessRunning ? (
+              <input
+                  ref={inputRef}
+                  type={status === 'password' ? 'password' : 'text'}
+                  value={inputValue}
+                  onChange={(e) => {
+                      if (!isProcessRunning) {
+                        setInputValue(e.target.value);
+                      }
+                  }}
+                  onKeyDown={handleKeyDown}
+                  className="flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none"
+                  style={{ caretColor: 'hsl(var(--foreground))' }}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck="false"
+                  autoFocus
+              />
             ) : null}
 
             {isProcessRunning && (
@@ -876,22 +887,6 @@ Already up to date.`
             )}
 
             <input
-              ref={inputRef}
-              type={status === 'password' ? 'password' : 'text'}
-              value={inputValue}
-              onChange={(e) => {
-                if (!isProcessRunning) {
-                  setInputValue(e.target.value)
-                }
-              }}
-              onKeyDown={handleKeyDown}
-              className="absolute top-[-9999px] left-[-9999px] opacity-0 w-0 h-0"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck="false"
-              autoFocus
-            />
-             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
