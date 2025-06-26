@@ -276,9 +276,11 @@ export default function TtyChat() {
   }, [decoyAction, status]);
 
   useEffect(() => {
+    // A small delay helps ensure the DOM is updated, especially on mobile,
+    // before we try to scroll.
     const timer = setTimeout(() => {
       endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    }, 150);
     
     inputRef.current?.focus();
 
@@ -863,10 +865,10 @@ Already up to date.`
           <form onSubmit={handleSubmit} className="flex items-center">
             {renderPrompt(status)}
             {status !== 'password' && !isProcessRunning ? (
-              <div className="flex items-center" dir="ltr">
-                <span className="whitespace-pre">{inputValue}</span>
-                <span className="w-2 h-4 bg-foreground animate-pulse" />
-              </div>
+              <span className="whitespace-pre" dir="ltr">
+                {`\u200e${inputValue}`}
+                <span className="inline-block w-2 h-4 bg-foreground animate-pulse align-middle ml-px" />
+              </span>
             ) : null}
 
             {isProcessRunning && (
