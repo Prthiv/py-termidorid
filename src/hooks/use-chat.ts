@@ -130,8 +130,8 @@ export function useChat(secret: string | null, sessionId: string | null) {
       
       await addDoc(collection(db, CHAT_COLLECTION), docData);
 
-      // Send a push notification
-      await sendNotification({ author, message: content, senderSessionId: sessionId });
+      // Send a push notification (fire and forget)
+      sendNotification({ author, message: content, senderSessionId: sessionId });
 
     } catch (error: any) {
       console.error('Error sending message:', error);
@@ -168,8 +168,8 @@ export function useChat(secret: string | null, sessionId: string | null) {
       filename: file.name
     });
 
-    // Send a push notification for the file transfer
-    await sendNotification({ author, message: `Sending a file: ${file.name}`, senderSessionId: sessionId });
+    // Send a push notification for the file transfer (fire and forget)
+    sendNotification({ author, message: `Sending a file: ${file.name}`, senderSessionId: sessionId });
     
     await sendFile(file, docRef.id);
 

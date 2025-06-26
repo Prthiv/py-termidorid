@@ -112,6 +112,8 @@ export default function TtyChat() {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialBootDone = useRef(false);
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (isAuthenticated && !isDecoyMode) {
@@ -127,6 +129,10 @@ export default function TtyChat() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    endOfMessagesRef.current?.scrollIntoView();
+  }, [terminalOutput, messages]);
 
   useEffect(() => {
     if (status === 'loading' && !initialBootDone.current) {
@@ -276,24 +282,28 @@ export default function TtyChat() {
   }, [decoyAction, status]);
 
   useEffect(() => {
-    // Focus the input when the component mounts or the output changes,
-    // allowing for natural browser scrolling.
     inputRef.current?.focus();
   }, [terminalOutput, messages]);
   
   const renderMessage = (msg: DecryptedMessage) => {
+    const isCurrentUser = msg.sessionId ? msg.sessionId === sessionId : msg.author === user?.username;
+
     if (msg.text === emergencyMessageText) {
       return <p key={msg.id} className="text-destructive font-bold">{msg.text}</p>
     }
 
     if (msg.text === urgentNotificationText) {
+       // If the current user sent this "urgent" message, don't display anything.
+      // The confirmation is already shown in handleSubmit.
+      if (isCurrentUser) {
+        return null;
+      }
       const hash = msg.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const randomIndex = hash % urgentDecoyMessages.length;
       const decoyMessage = urgentDecoyMessages[randomIndex];
       return <p key={msg.id} className="text-yellow-400 font-bold">{decoyMessage}</p>
     }
 
-    const isCurrentUser = msg.sessionId ? msg.sessionId === sessionId : msg.author === user?.username;
 
     if ((msg.messageType === 'image' || msg.messageType === 'video')) {
       const fileType = msg.messageType;
@@ -858,30 +868,33 @@ Already up to date.`
           <form onSubmit={handleSubmit} className="flex items-center">
             {renderPrompt(status)}
             
-            {status !== 'loading' && !isProcessRunning ? (
-              <input
-                  ref={inputRef}
-                  type={status === 'password' ? 'password' : 'text'}
-                  value={inputValue}
-                  onChange={(e) => {
-                      if (!isProcessRunning) {
-                        setInputValue(e.target.value);
-                      }
-                  }}
-                  onKeyDown={handleKeyDown}
-                  className={cn(
-                    "flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none",
-                    status === 'password' && "text-transparent caret-transparent selection:bg-transparent"
-                  )}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck="false"
-                  autoFocus
-              />
-            ) : null}
+            <input
+                ref={inputRef}
+                type={status === 'password' ? 'password' : 'text'}
+                value={inputValue}
+                onChange={(e) => {
+                    if (!isProcessRunning) {
+                      setInputValue(e.target.value);
+                    }
+                }}
+                onKeyDown={handleKeyDown}
+                className={cn(
+                  "flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none",
+                  status === 'password' && "text-transparent caret-transparent selection:bg-transparent"
+                )}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck="false"
+                autoFocus
+                disabled={isProcessRunning}
+            />
 
             {isProcessRunning && (
-              <span className="text-muted-foreground">Process running... (Press Ctrl+C or Ctrl+Z to interrupt)</span>
+              <span className="text-muted-foreground animate-pulse">Process running... (Ctrl+C to interrupt)</span>
+            )}
+            
+            {!isProcessRunning && status !== 'password' && (
+              <span className="inline-block w-2 h-4 bg-foreground animate-pulse" />
             )}
 
             <input
@@ -893,6 +906,7 @@ Already up to date.`
             />
           </form>
         )}
+        <div ref={endOfMessagesRef} />
       </div>
       
       {isAuthenticated && !isDecoyMode && (
