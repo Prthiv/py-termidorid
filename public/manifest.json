@@ -1,6 +1,11 @@
 {
   "name": "py-termx",
   "short_name": "py-termx",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0A14",
+  "theme_color": "#0A0A14",
+  "description": "Encrypted peer-to-peer terminal session.",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -12,10 +17,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#0A0A14",
-  "background_color": "#0A0A14",
-  "start_url": "/",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }

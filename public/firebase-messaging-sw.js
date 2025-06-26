@@ -1,41 +1,51 @@
-// IMPORTANT: This file must be in the `public` directory.
+// IMPORTANT: This file MUST be in the /public folder.
 
-// This service worker handles background push notifications.
-// It must be initialized with your Firebase project's configuration.
+// Give the service worker access to Firebase Messaging.
+// Note that you can only use Firebase Messaging here, other Firebase libraries
+// are not available in the service worker.
+try {
+  importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/9.15.0/firebase-messaging-compat.js');
 
-// --- STEP 1: Import Firebase ---
-// The Firebase libraries are imported via a Content Delivery Network (CDN).
-importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
-
-// --- STEP 2: Add Your Firebase Configuration ---
-// TODO: Replace the placeholder values below with your actual Firebase project
-// configuration. You can find this in your Firebase project settings, or
-// copy it from the `firebaseConfig` object in `src/lib/firebase.ts`.
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-// --- STEP 3: Initialize Firebase ---
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
-
-// --- STEP 4: Handle Background Messages ---
-// This function is triggered when the app is in the background or closed.
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message: ', payload);
-
-  const notificationTitle = payload.notification.title || 'New Message';
-  const notificationOptions = {
-    body: payload.notification.body || '',
-    icon: '/icon-192.png' // Optional: Add an icon file to your /public folder
+  // --- STEP 3 from the guide goes here ---
+  //
+  // IMPORTANT: REPLACE THE PLACEHOLDER CONFIGURATION BELOW
+  // with your own Firebase project's configuration.
+  //
+  // To get this, go to:
+  // Firebase Console > Project Settings > General Tab > Your apps > SDK setup and configuration
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID",
+    measurementId: "YOUR_MEASUREMENT_ID"
   };
 
-  // The service worker shows the notification to the user.
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+  // Initialize the Firebase app in the service worker with the Firebase config
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+
+  // Retrieve an instance of Firebase Messaging so that it can handle background
+  // messages.
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage(function(payload) {
+    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+
+    // Customize notification here
+    const notificationTitle = payload.notification.title || "New Message";
+    const notificationOptions = {
+      body: payload.notification.body || "",
+      icon: '/icons/icon-192x192.png'
+    };
+
+    self.registration.showNotification(notificationTitle, notificationOptions);
+  });
+
+} catch (e) {
+  console.error("Error in service worker, push notifications may not work.", e)
+}
