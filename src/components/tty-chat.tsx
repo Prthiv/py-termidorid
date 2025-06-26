@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 import { TriangleAlert } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { usePushNotifications } from '../hooks/use-push-notifications';
+import { cn } from '../lib/utils';
 
 const loadingSequence = [
   'Booting secure kernel v2.1.8...',
@@ -108,7 +109,6 @@ export default function TtyChat() {
   const [cwd, setCwd] = useState(['home', 'admin']);
 
   const processIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialBootDone = useRef(false);
@@ -276,13 +276,9 @@ export default function TtyChat() {
   }, [decoyAction, status]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 150);
-    
+    // Focus the input when the component mounts or the output changes,
+    // allowing for natural browser scrolling.
     inputRef.current?.focus();
-
-    return () => clearTimeout(timer);
   }, [terminalOutput, messages]);
   
   const renderMessage = (msg: DecryptedMessage) => {
@@ -873,8 +869,10 @@ Already up to date.`
                       }
                   }}
                   onKeyDown={handleKeyDown}
-                  className="flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none"
-                  style={{ caretColor: 'hsl(var(--foreground))' }}
+                  className={cn(
+                    "flex-1 bg-transparent border-none p-0 focus:ring-0 text-foreground font-mono text-base outline-none",
+                    status === 'password' && "text-transparent caret-transparent selection:bg-transparent"
+                  )}
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck="false"
@@ -895,7 +893,6 @@ Already up to date.`
             />
           </form>
         )}
-        <div ref={endOfMessagesRef} />
       </div>
       
       {isAuthenticated && !isDecoyMode && (

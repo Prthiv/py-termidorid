@@ -178,11 +178,13 @@ export function useWebRTC(sessionId: string | null) {
 
       // Listen for answer and callee's ICE candidates
       onSnapshot(roomRef, async (snapshot) => {
+        if (!pc.current) return; // Guard against race condition on unmount
+
         const data = snapshot.data();
-        if (!pc.current?.currentRemoteDescription && data?.answer) {
+        if (!pc.current.currentRemoteDescription && data?.answer) {
           try {
             const answer = new RTCSessionDescription(data.answer);
-            await pc.current!.setRemoteDescription(answer);
+            await pc.current.setRemoteDescription(answer);
 
             candidateQueue.current.forEach(candidate => {
               pc.current?.addIceCandidate(candidate).catch(e => console.error("Error adding queued ICE candidate:", e));
@@ -195,6 +197,8 @@ export function useWebRTC(sessionId: string | null) {
       });
 
       onSnapshot(calleeCandidates, snapshot => {
+        if (!pc.current) return; // Guard against race condition on unmount
+
         snapshot.docChanges().forEach(change => {
           if (change.type === 'added') {
             const candidate = new RTCIceCandidate(change.doc.data());
@@ -221,14 +225,16 @@ export function useWebRTC(sessionId: string | null) {
 
       // Listen for caller's ICE candidates
       onSnapshot(callerCandidates, snapshot => {
+        if (!pc.current) return; // Guard against race condition on unmount
+
         snapshot.docChanges().forEach(change => {
           if (change.type === 'added') {
-            pc.current!.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(e => console.error("Error adding ICE candidate:", e));
+            pc.current?.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(e => console.error("Error adding ICE candidate:", e));
           }
         });
       });
     }
-  }, [sessionId, setupPeerConnection]);
+  }, [sessionId, setupPeerConnection, cleanup]);
 
   const sendFile = useCallback(async (file: File, messageId: string) => {
     if (!sendChannel.current || sendChannel.current.readyState !== 'open') {
