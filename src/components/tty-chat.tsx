@@ -115,6 +115,7 @@ export default function TtyChat() {
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const initialBootDone = useRef(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const userScrolledUp = useRef(false);
 
 
   useEffect(() => {
@@ -133,18 +134,20 @@ export default function TtyChat() {
       }
     };
   }, []);
-
-  useEffect(() => {
+  
+  const handleScroll = () => {
     const terminal = terminalContainerRef.current;
     if (terminal) {
-      // Check if the user is scrolled to the bottom before new content is added.
-      // We use a small threshold to account for fractional pixel values or padding.
-      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 5;
+      // A small threshold of 1px helps account for fractional pixel values.
+      const atBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 1;
+      userScrolledUp.current = !atBottom;
+    }
+  };
 
-      if (isScrolledToBottom) {
-        // If they were at the bottom, scroll instantly to the new bottom.
-        endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
-      }
+  useEffect(() => {
+    // Only scroll to the bottom if the user hasn't manually scrolled up.
+    if (!userScrolledUp.current) {
+      endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
     }
   }, [terminalOutput, messages]);
   
@@ -877,7 +880,7 @@ Already up to date.`
   
   return (
     <div className="flex flex-col h-dvh p-4 font-mono text-base relative" onClick={() => inputRef.current?.focus()}>
-      <div ref={terminalContainerRef} className="flex-grow overflow-y-auto">
+      <div ref={terminalContainerRef} onScroll={handleScroll} className="flex-grow overflow-y-auto">
         {terminalOutput.map((line, index) => (
           <div key={`terminal-line-${index}`}>{typeof line === 'string' ? <span className="whitespace-pre-wrap">{line}</span> : line}</div>
         ))}
