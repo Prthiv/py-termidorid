@@ -137,12 +137,13 @@ export default function TtyChat() {
   useEffect(() => {
     const terminal = terminalContainerRef.current;
     if (terminal) {
-      // Only auto-scroll if the user is already near the bottom.
-      // This prevents the view from jumping if they've scrolled up to read history.
-      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 150;
+      // Check if the user is scrolled to the bottom before new content is added.
+      // We use a small threshold to account for fractional pixel values or padding.
+      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 5;
 
       if (isScrolledToBottom) {
-        endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // If they were at the bottom, scroll instantly to the new bottom.
+        endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
       }
     }
   }, [terminalOutput, messages]);
@@ -947,5 +948,3 @@ Already up to date.`
     </div>
   );
 }
-
-    
