@@ -91,7 +91,7 @@ const initialVFS = {
 
 
 export default function TtyChat() {
-  const { isAuthenticated, isDecoyMode, user, login, logout, secret, sessionId, authLoading } = useAuth();
+  const { isAuthenticated, isDecoyMode, user, login, logout, secret, sessionId, enterDecoyMode, authLoading } = useAuth();
   const { messages, loading: chatLoading, sendMessage, sendUrgentNotificationMessage, sendFileMessage, connectWebRTC, isWebRTCConnected, clearChatHistory, urgentNotificationText } = useChat(isDecoyMode ? null : secret, sessionId);
   const { subscribe, unsubscribe, isSubscribed } = usePwaPush();
   const { toast } = useToast();
@@ -141,7 +141,7 @@ export default function TtyChat() {
       const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + threshold;
       
       if (isScrolledToBottom) {
-        endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+        endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
       }
     }
   }, [terminalOutput, messages]);
@@ -738,10 +738,8 @@ Already up to date.`
     }
     setHistoryIndex(-1);
 
-    const currentPrompt = renderPrompt(status);
-
     if (status === 'guest') {
-      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}{commandLine}</div>]);
+      setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('guest')}{commandLine}</div>]);
       const lowerCaseCommand = trimmedCommand.toLowerCase();
       
       if (lowerCaseCommand === 'sudo connect') {
@@ -774,7 +772,7 @@ Already up to date.`
         }
       }
     } else if (status === 'password') {
-      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}</div>]);
+      setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('password')}</div>]);
       const success = login(commandLine);
       if (!success) {
         setTimeout(() => {
@@ -786,7 +784,7 @@ Already up to date.`
         const lowerCaseCommand = trimmedCommand.toLowerCase();
       
         if (trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(lowerCaseCommand)) {
-            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+             setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('authenticated')}<span className="whitespace-pre">{commandLine}</span></div>]);
             
             if (lowerCaseCommand.startsWith('/urgent')) {
                 if (user && sessionId && sendUrgentNotificationMessage) {
@@ -807,17 +805,17 @@ Already up to date.`
         }
     } else if (status === 'decoy') {
         if(trimmedCommand) {
-            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+            setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('decoy')}<span className="whitespace-pre">{commandLine}</span></div>]);
             handleDecoyCommand(trimmedCommand);
         } else {
-            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+            setTerminalOutput(prev => [...prev, <div key={prev.length}>{renderPrompt('decoy')}<span className="whitespace-pre">{commandLine}</span></div>]);
         }
     }
   };
   
-  const handleEmergency = async () => {
+  const handleEmergency = () => {
     if (user && sessionId) {
-      await sendMessage(emergencyMessageText, user.username, sessionId);
+      sendMessage(emergencyMessageText, user.username, sessionId);
     }
     const actions = ['download', 'fsck', 'compile'];
     const randomAction = actions[Math.floor(Math.random() * actions.length)];
@@ -939,6 +937,9 @@ Already up to date.`
           <TriangleAlert className="h-5 w-5" />
         </Button>
       )}
+      <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
     </div>
   );
 }
+
+    
