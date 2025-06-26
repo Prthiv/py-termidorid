@@ -134,8 +134,9 @@ export function useChat(secret: string | null, sessionId: string | null) {
       
       await addDoc(collection(db, CHAT_COLLECTION), docData);
 
-      const notificationMessage = isUrgent ? "You have received a new message." : content;
-      sendPushNotification({ author, message: notificationMessage });
+      if (isUrgent) {
+        sendPushNotification({ author, message: "You have received a new message." });
+      }
 
     } catch (error: any) {
       console.error('Error sending message:', error);
@@ -176,9 +177,7 @@ export function useChat(secret: string | null, sessionId: string | null) {
       messageType: messageType,
       filename: file.name
     });
-    
-    sendPushNotification({ author, message: `Sending a file: ${file.name}` });
-    
+        
     await sendFile(file, docRef.id);
 
   }, [secret, sendFile, toast]);
