@@ -135,7 +135,16 @@ export default function TtyChat() {
   }, []);
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
+    const terminal = terminalContainerRef.current;
+    if (terminal) {
+      // Only auto-scroll if the user is already near the bottom.
+      // This prevents the view from jumping if they've scrolled up to read history.
+      const isScrolledToBottom = terminal.scrollHeight - terminal.clientHeight <= terminal.scrollTop + 150;
+
+      if (isScrolledToBottom) {
+        endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
   }, [terminalOutput, messages]);
   
   useEffect(() => {
@@ -730,13 +739,10 @@ Already up to date.`
     }
     setHistoryIndex(-1);
 
-    // Render local commands immediately
-    if (status !== 'authenticated' || trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(trimmedCommand.toLowerCase())) {
-        const prompt = renderPrompt(status);
-        setTerminalOutput(prev => [...prev, <div key={prev.length}>{prompt}<span className="whitespace-pre">{commandLine}</span></div>]);
-    }
+    const currentPrompt = renderPrompt(status);
 
     if (status === 'guest') {
+      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}{commandLine}</div>]);
       const lowerCaseCommand = trimmedCommand.toLowerCase();
       
       if (lowerCaseCommand === 'sudo connect') {
@@ -769,6 +775,7 @@ Already up to date.`
         }
       }
     } else if (status === 'password') {
+      setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}</div>]);
       const success = login(commandLine);
       if (!success) {
         setTimeout(() => {
@@ -780,6 +787,8 @@ Already up to date.`
         const lowerCaseCommand = trimmedCommand.toLowerCase();
       
         if (trimmedCommand.startsWith('/') || ['qc', 'clear'].includes(lowerCaseCommand)) {
+            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
+            
             if (lowerCaseCommand.startsWith('/urgent')) {
                 if (user && sessionId && sendUrgentNotificationMessage) {
                     sendUrgentNotificationMessage(user.username, sessionId);
@@ -799,7 +808,10 @@ Already up to date.`
         }
     } else if (status === 'decoy') {
         if(trimmedCommand) {
+            setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}<span className="whitespace-pre">{commandLine}</span></div>]);
             handleDecoyCommand(trimmedCommand);
+        } else {
+             setTerminalOutput(prev => [...prev, <div key={prev.length}>{currentPrompt}</div>]);
         }
     }
   };
@@ -935,7 +947,5 @@ Already up to date.`
     </div>
   );
 }
-
-    
 
     
