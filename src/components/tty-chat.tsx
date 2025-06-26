@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent, FormEvent, ChangeEvent } from 'react';
@@ -859,13 +860,13 @@ Already up to date.`
         )}
         
         {status !== 'loading' && (
-          <form onSubmit={handleSubmit} className="flex items-center" dir="ltr">
+          <form onSubmit={handleSubmit} className="flex items-center">
             {renderPrompt(status)}
             {status !== 'password' && !isProcessRunning ? (
-              <>
+              <div className="flex items-center" dir="ltr">
                 <span className="whitespace-pre">{inputValue}</span>
                 <span className="w-2 h-4 bg-foreground animate-pulse" />
-              </>
+              </div>
             ) : null}
 
             {isProcessRunning && (
@@ -897,9 +898,9 @@ Already up to date.`
             />
           </form>
         )}
-        
         <div ref={endOfMessagesRef} />
       </div>
+      
       {isAuthenticated && !isDecoyMode && (
         <Button
           variant="destructive"
